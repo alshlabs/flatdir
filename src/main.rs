@@ -1,12 +1,13 @@
-use clap::Parser;
-use normalize_path::NormalizePath;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-use walkdir::WalkDir;
+
+use clap::Parser;
+use normalize_path::NormalizePath;
 use slugify::slugify;
+use walkdir::WalkDir;
 
 #[derive(Parser, Debug)]
 struct Commands {
@@ -25,15 +26,12 @@ fn main() -> anyhow::Result<()> {
   let scan_dir: PathBuf;
   if let Some(target) = cmd.scan_dir {
     if target.is_relative() {
-      scan_dir = std::env::current_dir()?
-        .join(target)
-        .normalize();
+      scan_dir = std::env::current_dir()?.join(target).normalize();
     } else {
       scan_dir = target;
     }
   } else {
-    scan_dir = std::env::current_dir()?
-        .normalize();
+    scan_dir = std::env::current_dir()?.normalize();
   }
 
   println!("Config:");
@@ -44,13 +42,13 @@ fn main() -> anyhow::Result<()> {
   let mut matches = HashMap::<PathBuf, PathBuf>::new();
   let mut delete = HashSet::<PathBuf>::new();
 
-  println!("");
+  println!();
 
   for entry in WalkDir::new(&scan_dir) {
     let entry = entry?;
     let entry_path = entry.path();
 
-    if entry_path.is_dir() && entry_path != &scan_dir {
+    if entry_path.is_dir() && entry_path != scan_dir {
       delete.insert(entry_path.to_path_buf());
       continue;
     }
@@ -59,30 +57,52 @@ fn main() -> anyhow::Result<()> {
       continue;
     }
 
-    let file_ext = entry_path.extension().unwrap().to_str().unwrap().to_string();
-    let file_name = entry_path.file_name().unwrap().to_str().unwrap().to_string();
-    let file_stem = entry_path.file_stem().unwrap().to_str().unwrap().to_string();
-    let file_name_slug: String;
+    let file_ext = entry_path
+      .extension()
+      .unwrap()
+      .to_str()
+      .unwrap()
+      .to_string();
+    let file_name = entry_path
+      .file_name()
+      .unwrap()
+      .to_str()
+      .unwrap()
+      .to_string();
+    let file_stem = entry_path
+      .file_stem()
+      .unwrap()
+      .to_str()
+      .unwrap()
+      .to_string();
 
-    if cmd.no_slugify {
-      file_name_slug = format!("{}.{}", &file_stem, &file_ext);
+    let file_name_slug: String = if cmd.no_slugify {
+      format!("{}.{}", file_stem, file_ext)
     } else {
-      file_name_slug = format!("{}.{}", slugify!(entry_path.file_stem().unwrap().to_str().unwrap()), file_ext);
-    }
+      format!(
+        "{}.{}",
+        slugify!(entry_path.file_stem().unwrap().to_str().unwrap()),
+        file_ext
+      )
+    };
 
-    if entry_path.parent().unwrap() == &scan_dir && file_name == file_name_slug {
+    if entry_path.parent().unwrap() == scan_dir && file_name == file_name_slug {
       continue;
     };
 
     let target = scan_dir.join(&file_name_slug);
     matches.insert(entry_path.to_path_buf(), target);
 
-    let src = pathdiff::diff_paths(&entry_path, &scan_dir).unwrap();
-    println!("  From: {}\n  To:   {}\n", src.to_str().unwrap(), file_name_slug);
+    let src = pathdiff::diff_paths(entry_path, &scan_dir).unwrap();
+    println!(
+      "  From: {}\n  To:   {}\n",
+      src.to_str().unwrap(),
+      file_name_slug
+    );
   }
 
   if delete.is_empty() && matches.is_empty() {
-    println!("Nothing to do");    
+    println!("Nothing to do");
     return Ok(());
   }
 
@@ -90,9 +110,9 @@ fn main() -> anyhow::Result<()> {
   for entry in &delete {
     println!("  {}", entry.to_str().unwrap());
   }
-  
+
   if !cmd.force {
-    println!("");
+    println!();
     print!("Continue? ({} found) [y/N] ", matches.len());
     let mut line = String::new();
     let _ = std::io::stdout().flush();
@@ -104,7 +124,7 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
   } else {
-    println!("");
+    println!();
   }
 
   for (from, to) in matches.iter() {
@@ -114,8 +134,8 @@ fn main() -> anyhow::Result<()> {
 
   for entry in &delete {
     println!("  Del:  {}", entry.to_str().unwrap());
-    fs::remove_dir_all(&entry).ok();
+    fs::remove_dir_all(entry).ok();
   }
 
-  return Ok(())
+  Ok(())
 }
