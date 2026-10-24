@@ -1,7 +1,15 @@
 [package]
 name = "flatdir"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+
+[lints.rust]
+elided_lifetimes_in_paths = "allow"
+rust_2018_idioms = { priority = -1, level = "deny" }
+
+[lints.clippy]
+module_inception = "allow"
+uninlined_format_args = "allow"
 
 [dependencies]
 clap = { version = "4.5.48", features = ["derive"] }
